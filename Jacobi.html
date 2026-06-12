@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kalkulator SPL - Metode Jacobi</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --bg-color: #f3f4f6;
+            --card-bg: #ffffff;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --border-color: #e5e7eb;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --warning-bg: #fef3c7;
+            --success: #10b981;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            padding: 2rem;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        h1, h2, h3 {
+            color: var(--text-main);
+            margin-bottom: 1rem;
+        }
+
+        h1 { text-align: center; color: var(--primary); }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        input[type="number"] {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        input[type="number"]:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+
+        .btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .btn:hover { background-color: var(--primary-hover); }
+        .btn-full { width: 100%; margin-top: 1rem; }
+
+        /* Konfigurasi Awal */
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            align-items: end;
+        }
+
+        /* Area Matriks */
+        .matrix-area {
+            display: flex;
+            gap: 2rem;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+            overflow-x: auto;
+        }
+
+        .matrix-container { display: flex; flex-direction: column; }
+        
+        .matrix-grid {
+            display: grid;
+            gap: 0.5rem;
+        }
+
+        .matrix-input {
+            width: 70px;
+            text-align: center;
+        }
+
+        .alert {
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            display: none;
+            font-weight: 600;
+        }
+
+        .alert.warning {
+            background-color: var(--warning-bg);
+            color: var(--warning);
+            border: 1px solid var(--warning);
+            display: block;
+        }
+
+        .alert.success { background-color: #d1fae5; color: var(--success); border: 1px solid var(--success); display: block; }
+        .alert.danger { background-color: #fee2e2; color: var(--danger); border: 1px solid var(--danger); display: block; }
+
+        /* Output Area */
+        #output-section { display: none; }
+        
+        .chart-container {
+            position: relative;
+            height: 400px;
+            width: 100%;
+            margin-top: 2rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 2rem;
+            font-size: 0.95rem;
+        }
+
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th { background-color: #f8fafc; font-weight: 600; }
+        tr:hover { background-color: #f1f5f9; }
+
+        @media (max-width: 768px) {
+            .matrix-area { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card">
+        <h1>Kalkulator SPL - Metode Jacobi</h1>
+        <p style="text-align: center; color: var(--text-muted); margin-bottom: 2rem;">
+            Penyelesaian Sistem Persamaan Linier dengan Iterasi Numerik
+        </p>
+
+        <div class="config-grid">
+            <div class="form-group">
+                <label>Ukuran Matriks (n x n)</label>
+                <input type="number" id="matrix-size" min="2" max="5" value="3">
+            </div>
+            <div class="form-group">
+                <label>Toleransi Error (Epsilon)</label>
+                <input type="number" id="tolerance" value="0.0001" step="0.0001">
+            </div>
+            <div class="form-group">
+                <label>Maksimum Iterasi</label>
+                <input type="number" id="max-iter" value="50" min="1">
+            </div>
+            <button class="btn" onclick="generateMatrixInputs()">Buat Grid Matriks</button>
+        </div>
+
+        <hr style="margin: 2rem 0; border: none; border-top: 1px solid var(--border-color);">
+
+        <div id="matrix-section" style="display: none;">
+            <h3>Input Koefisien dan Konstanta</h3>
+            <div id="sdd-warning" class="alert"></div>
+            
+            <div class="matrix-area">
+                <div class="matrix-container">
+                    <label>Matriks A (Koefisien)</label>
+                    <div id="matrix-A" class="matrix-grid"></div>
+                </div>
+                <div class="matrix-container">
+                    <label>Vektor b (Konstanta)</label>
+                    <div id="vector-b" class="matrix-grid" style="grid-template-columns: 1fr;"></div>
+                </div>
+                <div class="matrix-container">
+                    <label>Tebakan Awal (x₀)</label>
+                    <div id="initial-guess" class="matrix-grid" style="grid-template-columns: 1fr;"></div>
+                </div>
+            </div>
+
+            <button class="btn btn-full" onclick="solveJacobi()">Hitung Penyelesaian</button>
+        </div>
+    </div>
+
+    <div class="card" id="output-section">
+        <h2>Hasil Analisis</h2>
+        <div id="final-result"></div>
+        
+        <div class="chart-container">
+            <canvas id="convergenceChart"></canvas>
+        </div>
+
+        <div style="overflow-x: auto;">
+            <table id="iteration-table">
+                <thead>
+                    <tr id="table-header"></tr>
+                </thead>
+                <tbody id="table-body"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    let chartInstance = null;
+
+    // Inisialisasi awal
+    window.onload = () => generateMatrixInputs();
+
+    function generateMatrixInputs() {
+        const n = parseInt(document.getElementById('matrix-size').value);
+        if (n < 2 || n > 5) {
+            alert("Harap masukkan ukuran matriks antara 2 hingga 5.");
+            return;
+        }
+
+        const matrixA = document.getElementById('matrix-A');
+        const vectorB = document.getElementById('vector-b');
+        const initialGuess = document.getElementById('initial-guess');
+
+        matrixA.innerHTML = '';
+        vectorB.innerHTML = '';
+        initialGuess.innerHTML = '';
+
+        matrixA.style.gridTemplateColumns = `repeat(${n}, 1fr)`;
+
+        for (let i = 0; i < n; i++) {
+            for (let j = 0; j < n; j++) {
+                matrixA.innerHTML += `<input type="number" class="matrix-input" id="a_${i}_${j}" step="any" value="${i===j ? 5 : 1}">`;
+            }
+            vectorB.innerHTML += `<input type="number" class="matrix-input" id="b_${i}" step="any" value="${i+10}">`;
+            initialGuess.innerHTML += `<input type="number" class="matrix-input" id="x0_${i}" step="any" value="0">`;
+        }
+
+        document.getElementById('matrix-section').style.display = 'block';
+        document.getElementById('output-section').style.display = 'none';
+        document.getElementById('sdd-warning').className = 'alert';
+        document.getElementById('sdd-warning').style.display = 'none';
+    }
+
+    function checkSDD(A, n) {
+        let isSDD = true;
+        for (let i = 0; i < n; i++) {
+            let sum = 0;
+            for (let j = 0; j < n; j++) {
+                if (i !== j) sum += Math.abs(A[i][j]);
+            }
+            if (Math.abs(A[i][i]) <= sum) {
+                isSDD = false;
+                break;
+            }
+        }
+        return isSDD;
+    }
+
+    function solveJacobi() {
+        const n = parseInt(document.getElementById('matrix-size').value);
+        const tol = parseFloat(document.getElementById('tolerance').value);
+        const maxIter = parseInt(document.getElementById('max-iter').value);
+
+        // Parsing Input
+        let A = [];
+        let b = [];
+        let x = [];
+        for (let i = 0; i < n; i++) {
+            A[i] = [];
+            for (let j = 0; j < n; j++) {
+                A[i][j] = parseFloat(document.getElementById(`a_${i}_${j}`).value) || 0;
+            }
+            b[i] = parseFloat(document.getElementById(`b_${i}`).value) || 0;
+            x[i] = parseFloat(document.getElementById(`x0_${i}`).value) || 0;
+        }
+
+        // Pengecekan Strictly Diagonally Dominant (SDD)
+        const warningDiv = document.getElementById('sdd-warning');
+        if (!checkSDD(A, n)) {
+            warningDiv.innerHTML = "⚠️ <strong>Peringatan:</strong> Matriks tidak <em>Strictly Diagonally Dominant</em>. Konvergensi tidak dijamin, namun perhitungan dilanjutkan.";
+            warningDiv.className = 'alert warning';
+        } else {
+            warningDiv.style.display = 'none';
+        }
+
+        // Validasi Diagonal 0
+        for(let i=0; i<n; i++){
+            if(A[i][i] === 0){
+                warningDiv.innerHTML = `❌ <strong>Error:</strong> Elemen diagonal A[${i+1}][${i+1}] adalah 0. Metode Jacobi akan mengalami Division by Zero.`;
+                warningDiv.className = 'alert danger';
+                document.getElementById('output-section').style.display = 'none';
+                return;
+            }
+        }
+
+        // Algoritma Jacobi
+        let history = [];
+        history.push({ iter: 0, x: [...x], error: '-' });
+        
+        let converged = false;
+        let finalIter = 0;
+
+        for (let k = 1; k <= maxIter; k++) {
+            let x_new = new Array(n).fill(0);
+            let maxError = 0;
+
+            for (let i = 0; i < n; i++) {
+                let sum = 0;
+                for (let j = 0; j < n; j++) {
+                    if (i !== j) {
+                        sum += A[i][j] * x[j];
+                    }
+                }
+                x_new[i] = (b[i] - sum) / A[i][i];
+                
+                let currentError = Math.abs(x_new[i] - x[i]);
+                if (currentError > maxError) maxError = currentError;
+            }
+
+            history.push({ iter: k, x: [...x_new], error: maxError });
+            x = [...x_new];
+            finalIter = k;
+
+            if (maxError <= tol) {
+                converged = true;
+                break;
+            }
+        }
+
+        renderOutput(history, n, converged, tol);
+    }
+
+    function renderOutput(history, n, converged, tol) {
+        document.getElementById('output-section').style.display = 'block';
+
+        // Render Hasil Akhir
+        const finalRes = document.getElementById('final-result');
+        let resHTML = converged 
+            ? `<div class="alert success">✅ Konvergen pada iterasi ke-${history[history.length-1].iter} (Error ≤ ${tol})</div>` 
+            : `<div class="alert warning">⚠️ Berhenti pada maksimum iterasi (Batas toleransi belum tercapai).</div>`;
+        
+        resHTML += `<p><strong>Akar Persamaan (Nilai x):</strong></p><ul style="list-style-type:none; padding-left:0; margin-top:0.5rem;">`;
+        const lastX = history[history.length-1].x;
+        lastX.forEach((val, idx) => {
+            resHTML += `<li>x<sub>${idx+1}</sub> = <strong>${val.toFixed(6)}</strong></li>`;
+        });
+        resHTML += `</ul>`;
+        finalRes.innerHTML = resHTML;
+
+        // Render Tabel
+        const header = document.getElementById('table-header');
+        const body = document.getElementById('table-body');
+        
+        let headerHTML = `<th>Iterasi (k)</th>`;
+        for(let i=0; i<n; i++) headerHTML += `<th>x<sub>${i+1}</sub></th>`;
+        headerHTML += `<th>Error Maksimum</th>`;
+        header.innerHTML = headerHTML;
+
+        body.innerHTML = '';
+        history.forEach(row => {
+            let tr = `<tr><td>${row.iter}</td>`;
+            row.x.forEach(val => tr += `<td>${val.toFixed(6)}</td>`);
+            let errDisp = typeof row.error === 'number' ? row.error.toExponential(4) : row.error;
+            tr += `<td>${errDisp}</td></tr>`;
+            body.innerHTML += tr;
+        });
+
+        // Render Grafik
+        renderChart(history, n);
+    }
+
+    function renderChart(history, n) {
+        const ctx = document.getElementById('convergenceChart').getContext('2d');
+        if (chartInstance) chartInstance.destroy();
+
+        const labels = history.map(h => `k=${h.iter}`);
+        const datasets = [];
+        
+        const colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'];
+
+        for(let i=0; i<n; i++) {
+            const dataPts = history.map(h => h.x[i]);
+            datasets.push({
+                label: `x${i+1}`,
+                data: dataPts,
+                borderColor: colors[i % colors.length],
+                backgroundColor: colors[i % colors.length],
+                fill: false,
+                tension: 0.1,
+                borderWidth: 2
+            });
+        }
+
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: { labels, datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: 'Grafik Konvergensi Nilai x' },
+                    tooltip: { mode: 'index', intersect: false }
+                },
+                scales: {
+                    x: { title: { display: true, text: 'Iterasi' } },
+                    y: { title: { display: true, text: 'Nilai' } }
+                }
+            }
+        });
+    }
+</script>
+
+</body>
+</html>
